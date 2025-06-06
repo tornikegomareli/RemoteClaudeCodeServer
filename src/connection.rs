@@ -1,6 +1,5 @@
-use chrono::Local;
 use futures_util::{SinkExt, StreamExt};
-use log::{error, info, warn};
+use log::error;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpStream;
@@ -9,6 +8,7 @@ use tokio_tungstenite::{accept_async, tungstenite::Message};
 
 use crate::config::ServerConfig;
 use crate::types::{AuthStatus, ServerState};
+use crate::ui::TerminalUI;
 
 pub struct ConnectionHandler {
     config: ServerConfig,
@@ -25,21 +25,12 @@ impl ConnectionHandler {
         addr: SocketAddr,
         state: ServerState,
     ) {
-        info!(
-            "[{}] New connection attempt from: {}",
-            Local::now().format("%Y-%m-%d %H:%M:%S"),
-            addr
-        );
+        TerminalUI::print_client_connected(&addr.to_string());
 
-        // Check if another client is already connected
         {
             let connected = state.connected_client.read().await;
             if connected.is_some() {
-                warn!(
-                    "[{}] Rejecting connection from {} - another client is already connected",
-                    Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    addr
-                );
+                TerminalUI::print_client_rejected(&addr.to_string(), "another client is already connected");
                 return;
             }
         }
@@ -54,31 +45,19 @@ impl ConnectionHandler {
 
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
-        // Wait for authentication message with timeout
-        info!(
-            "[{}] Waiting for authentication from {}",
-            Local::now().format("%Y-%m-%d %H:%M:%S"),
-            addr
-        );
 
         let auth_result = timeout(self.config.auth_timeout, ws_receiver.next()).await;
 
         match auth_result {
             Ok(Some(Ok(Message::Text(received_uuid)))) => {
                 if state.auth_uuid == received_uuid.trim() {
-                    info!(
-                        "[{}] Client {} authenticated successfully",
-                        Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        addr
-                    );
+                    TerminalUI::print_client_authenticated(&addr.to_string());
 
-                    // Mark this client as connected
                     {
                         let mut connected = state.connected_client.write().await;
                         *connected = Some(addr);
                     }
 
-                    // Send success message
                     if let Err(e) = ws_sender
                         .send(Message::Text(AuthStatus::Success.as_str().to_string()))
                         .await
@@ -87,7 +66,6 @@ impl ConnectionHandler {
                         return;
                     }
 
-                    // Handle authenticated connection
                     self.handle_authenticated_client(ws_sender, ws_receiver, addr, state)
                         .await;
                 } else {
@@ -126,12 +104,7 @@ impl ConnectionHandler {
         status: AuthStatus,
         reason: &str,
     ) {
-        warn!(
-            "[{}] Client {} authentication failed - {}",
-            Local::now().format("%Y-%m-%d %H:%M:%S"),
-            addr,
-            reason
-        );
+        TerminalUI::print_client_rejected(&addr.to_string(), reason);
         let _ = ws_sender
             .send(Message::Text(status.as_str().to_string()))
             .await;
@@ -150,22 +123,11 @@ impl ConnectionHandler {
         addr: SocketAddr,
         state: ServerState,
     ) {
-        info!(
-            "[{}] Client {} is now connected and authenticated",
-            Local::now().format("%Y-%m-%d %H:%M:%S"),
-            addr
-        );
 
-        // Echo loop for authenticated client
         while let Some(msg) = ws_receiver.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
-                    info!(
-                        "[{}] Client {} sent: {}",
-                        Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        addr,
-                        text
-                    );
+                    TerminalUI::print_message_received(&addr.to_string(), &text);
 
                     if let Err(e) = ws_sender.send(Message::Text(text.clone())).await {
                         error!("Failed to echo message: {}", e);
@@ -173,11 +135,7 @@ impl ConnectionHandler {
                     }
                 }
                 Ok(Message::Close(_)) => {
-                    info!(
-                        "[{}] Client {} disconnecting",
-                        Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        addr
-                    );
+                    TerminalUI::print_client_disconnected(&addr.to_string());
                     break;
                 }
                 Err(e) => {
@@ -188,19 +146,14 @@ impl ConnectionHandler {
             }
         }
 
-        // Clean up connection state
         {
             let mut connected = state.connected_client.write().await;
             *connected = None;
         }
 
-        info!(
-            "[{}] Client {} disconnected. Server shutting down...",
-            Local::now().format("%Y-%m-%d %H:%M:%S"),
-            addr
-        );
+        TerminalUI::print_client_disconnected(&addr.to_string());
+        TerminalUI::print_server_shutdown();
 
-        // Gracefully shutdown the server
         tokio::time::sleep(Duration::from_millis(100)).await;
         std::process::exit(0);
     }
