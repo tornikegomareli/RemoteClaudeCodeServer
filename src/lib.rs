@@ -3,5 +3,6 @@ pub mod config;
 pub mod connection;
 pub mod server;
 pub mod types;
+pub mod ui;
 
 pub use server::WebSocketServer;
