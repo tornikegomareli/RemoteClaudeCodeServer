@@ -3,6 +3,14 @@ name = "remoteclaudecode-server"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "remoteclaudecode_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "remoteclaudecode-server"
+path = "src/main.rs"
+
 [dependencies]
 tokio = { version = "1.40", features = ["full"] }
 tokio-tungstenite = "0.24"
