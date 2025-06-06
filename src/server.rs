@@ -1,4 +1,3 @@
-use log::info;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
@@ -7,6 +6,7 @@ use crate::auth::AuthManager;
 use crate::config::ServerConfig;
 use crate::connection::ConnectionHandler;
 use crate::types::ServerState;
+use crate::ui::TerminalUI;
 
 pub struct WebSocketServer {
     config: ServerConfig,
@@ -24,8 +24,10 @@ impl WebSocketServer {
     }
 
     pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
-        info!("WebSocket server starting on: {}", self.config.websocket_url());
-        self.auth_manager.display_auth_info();
+        TerminalUI::display_startup_screen(
+            self.auth_manager.get_uuid(),
+            &self.config.websocket_url()
+        );
 
         let listener = TcpListener::bind(&self.config.bind_address()).await?;
 
@@ -33,9 +35,6 @@ impl WebSocketServer {
             auth_uuid: self.auth_manager.get_uuid().to_string(),
             connected_client: Arc::new(RwLock::new(None)),
         };
-
-        info!("Server is ready. Waiting for client connection...");
-        info!("Client must authenticate with UUID: {}", self.auth_manager.get_uuid());
 
         while let Ok((stream, addr)) = listener.accept().await {
             let state = state.clone();
@@ -49,7 +48,6 @@ impl WebSocketServer {
     }
 }
 
-// Implementing Clone for ServerConfig to use it in the server
 impl Clone for ServerConfig {
     fn clone(&self) -> Self {
         Self {
