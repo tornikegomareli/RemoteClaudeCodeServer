@@ -4,6 +4,7 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub auth_timeout: Duration,
+    pub remote_url: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -12,6 +13,7 @@ impl Default for ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 9001,
             auth_timeout: Duration::from_secs(5),
+            remote_url: std::env::var("REMOTE_URL").ok(),
         }
     }
 }
