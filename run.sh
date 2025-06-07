@@ -30,24 +30,39 @@ fi
 echo -e "${YELLOW}Configuring ngrok...${NC}"
 ngrok config add-authtoken $NGROK_AUTHTOKEN
 
-## Kill any existing processes on port 9001
 echo -e "${YELLOW}Cleaning up existing processes...${NC}"
 lsof -ti :9001 | xargs kill -9 2>/dev/null || true
 
-## Start the server in background
-echo -e "${GREEN}Starting RemoteClaudeCode server...${NC}"
-cargo run &
-SERVER_PID=$!
+# Start ngrok in background and capture URL
+echo -e "${GREEN}Starting ngrok tunnel...${NC}"
+ngrok http 9001 > /tmp/ngrok.log 2>&1 &
+NGROK_PID=$!
 
+# Wait for ngrok to start and get URL
+echo -e "${YELLOW}Waiting for ngrok to establish tunnel...${NC}"
 sleep 3
 
-## Start ngrok
-echo -e "${GREEN}Starting ngrok tunnel...${NC}"
-echo -e "${BLUE}Look for the public URL in the ngrok output below${NC}"
-echo -e "${BLUE}Use the wss:// version of the URL in your iOS app${NC}"
-echo
-ngrok http 9001
+# Get ngrok URL using API
+NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"[^"]*' | grep -o 'https://[^"]*' | head -1)
 
-## When ngrok is closed, kill the server
-kill $SERVER_PID 2>/dev/null || true
+if [ -z "$NGROK_URL" ]; then
+  echo -e "${RED}Failed to get ngrok URL. Make sure ngrok is running.${NC}"
+  kill $NGROK_PID 2>/dev/null
+  exit 1
+fi
 
+# Convert https to wss
+WS_URL="${NGROK_URL/https:/wss:}/ws"
+
+echo -e "${GREEN}ngrok tunnel established!${NC}"
+echo -e "${BLUE}Public WebSocket URL: ${WS_URL}${NC}"
+
+# Export URL for server to use
+export REMOTE_URL="$WS_URL"
+
+# Start server with the URL
+echo -e "${GREEN}Starting RemoteClaudeCode server with remote URL...${NC}"
+REMOTE_URL="$WS_URL" cargo run
+
+# Cleanup
+kill $NGROK_PID 2>/dev/null || true
