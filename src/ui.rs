@@ -156,7 +156,6 @@ impl TerminalUI {
 
     fn print_footer() {
         println!("\n{}", "─".repeat(70).bright_black());
-        println!("{}", "💡 Tip: Use start_with_ngrok.sh to include ngrok URL in QR code".dimmed());
         println!("{}", "Press Ctrl+C to stop the server".dimmed());
         println!("{}", "─".repeat(70).bright_black());
         println!();
