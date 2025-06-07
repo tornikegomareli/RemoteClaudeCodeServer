@@ -35,6 +35,7 @@ impl WebSocketServer {
         let state = ServerState {
             auth_uuid: self.auth_manager.get_uuid().to_string(),
             connected_client: Arc::new(RwLock::new(None)),
+            reconnection_tokens: Arc::new(RwLock::new(std::collections::HashMap::new())),
         };
 
         while let Ok((stream, addr)) = listener.accept().await {
