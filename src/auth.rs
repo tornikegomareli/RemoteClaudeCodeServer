@@ -1,4 +1,5 @@
 use uuid::Uuid;
+use crate::types::AuthMethod;
 
 pub struct AuthManager {
     auth_uuid: String,
@@ -14,7 +15,18 @@ impl AuthManager {
         &self.auth_uuid
     }
 
-    pub fn validate(&self, provided_uuid: &str) -> bool {
-        provided_uuid.trim() == self.auth_uuid
+    pub fn generate_reconnection_token() -> String {
+        Uuid::new_v4().to_string()
+    }
+
+    pub fn generate_client_id() -> String {
+        format!("client_{}", Uuid::new_v4().simple())
+    }
+
+    pub fn validate_auth(&self, auth_method: &AuthMethod) -> bool {
+        match auth_method {
+            AuthMethod::InitialUuid(uuid) => uuid.trim() == self.auth_uuid,
+            AuthMethod::ReconnectionToken(_) => true, // Token validation happens in connection handler
+        }
     }
 }
