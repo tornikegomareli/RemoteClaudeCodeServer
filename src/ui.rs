@@ -4,12 +4,13 @@ use crossterm::{
     terminal::{Clear, ClearType},
 };
 use qrcode::{render::unicode, QrCode};
+use serde_json::json;
 use std::io;
 
 pub struct TerminalUI;
 
 impl TerminalUI {
-    pub fn display_startup_screen(auth_uuid: &str, server_url: &str) {
+    pub fn display_startup_screen(auth_uuid: &str, server_url: &str, remote_url: Option<&str>) {
         // Clear terminal
         let _ = execute!(io::stdout(), Clear(ClearType::All));
 
@@ -20,10 +21,10 @@ impl TerminalUI {
         Self::print_system_info();
 
         // Display server info
-        Self::print_server_info(server_url, auth_uuid);
+        Self::print_server_info(server_url, auth_uuid, remote_url);
 
         // Display QR code
-        Self::print_qr_code(auth_uuid);
+        Self::print_qr_code(auth_uuid, remote_url);
 
         // Display iOS connection instructions
         Self::print_ios_instructions();
@@ -56,13 +57,20 @@ impl TerminalUI {
         println!("   • All messages are echoed back (for now - more features coming!)");
     }
 
-    fn print_server_info(server_url: &str, auth_uuid: &str) {
+    fn print_server_info(server_url: &str, auth_uuid: &str, remote_url: Option<&str>) {
         println!("\n{}", "📡 Server Information:".bright_green().bold());
         println!(
             "   {} {}",
-            "WebSocket URL:".bright_white(),
+            "Local URL:".bright_white(),
             server_url.bright_blue()
         );
+        if let Some(url) = remote_url {
+            println!(
+                "   {} {}",
+                "Remote URL:".bright_white(),
+                url.bright_green()
+            );
+        }
         println!(
             "   {} {}",
             "Status:".bright_white(),
@@ -75,10 +83,24 @@ impl TerminalUI {
         );
     }
 
-    fn print_qr_code(auth_uuid: &str) {
-        println!("\n{}", "📱 QR Code (contains UUID):".bright_green().bold());
+    fn print_qr_code(auth_uuid: &str, remote_url: Option<&str>) {
+        println!("\n{}", "📱 QR Code (contains connection info):".bright_green().bold());
+        
+        // Create JSON with UUID and URL if available
+        let qr_data = if let Some(url) = remote_url {
+            json!({
+                "uuid": auth_uuid,
+                "url": url,
+                "version": "1.0"
+            }).to_string()
+        } else {
+            json!({
+                "uuid": auth_uuid,
+                "version": "1.0"
+            }).to_string()
+        };
 
-        match QrCode::new(auth_uuid) {
+        match QrCode::new(&qr_data) {
             Ok(code) => {
                 let image = code
                     .render::<unicode::Dense1x2>()
@@ -87,7 +109,6 @@ impl TerminalUI {
                     .quiet_zone(false)
                     .build();
 
-                // Print QR code with border
                 let lines: Vec<&str> = image.lines().collect();
                 for line in lines {
                     println!("   {}", line);
@@ -135,6 +156,7 @@ impl TerminalUI {
 
     fn print_footer() {
         println!("\n{}", "─".repeat(70).bright_black());
+        println!("{}", "💡 Tip: Use start_with_ngrok.sh to include ngrok URL in QR code".dimmed());
         println!("{}", "Press Ctrl+C to stop the server".dimmed());
         println!("{}", "─".repeat(70).bright_black());
         println!();
