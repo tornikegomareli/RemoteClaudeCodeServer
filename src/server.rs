@@ -26,7 +26,8 @@ impl WebSocketServer {
     pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         TerminalUI::display_startup_screen(
             self.auth_manager.get_uuid(),
-            &self.config.websocket_url()
+            &self.config.websocket_url(),
+            self.config.remote_url.as_deref()
         );
 
         let listener = TcpListener::bind(&self.config.bind_address()).await?;
@@ -54,6 +55,7 @@ impl Clone for ServerConfig {
             host: self.host.clone(),
             port: self.port,
             auth_timeout: self.auth_timeout,
+            remote_url: self.remote_url.clone(),
         }
     }
 }
