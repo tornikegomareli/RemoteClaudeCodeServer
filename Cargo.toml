@@ -22,3 +22,5 @@ uuid = { version = "1.11", features = ["v4"] }
 qrcode = "0.14"
 colored = "2.1"
 crossterm = "0.28"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
