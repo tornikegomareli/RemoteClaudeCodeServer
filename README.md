@@ -1,62 +1,67 @@
-# Remote WebSocket Setup Guide
+# RemoteClaudeCode Server
 
-## Server Setup
+WebSocket server with UUID authentication for remote iOS client connection.
 
-### 1. Build and Run the Server
+## Prerequisites
+
+1. **Rust** - [Install from rustup.rs](https://rustup.rs/)
+2. **ngrok** - [Download from ngrok.com](https://ngrok.com/download)
+
+## Quick Start
+
+1. **Clone and setup:**
 ```bash
-cargo build --release
-RUST_LOG=info cargo run
+git clone <repo-url>
+cd RemoteClaudeCodeServer
+cp .env.example .env
 ```
 
-### 2. Server will display:
-- Authentication UUID
-- QR code for easy mobile scanning
-- WebSocket endpoint: `ws://localhost:9001/ws`
+2. **Add your ngrok token to `.env`:**
+   - Get your token from: https://dashboard.ngrok.com/get-started/your-authtoken
+   - Edit `.env` and replace `your_ngrok_authtoken_here` with your actual token
 
-### 3. Expose Server for Remote Access
+3. **Run everything:**
+```bash
+./run.sh
+```
 
-#### Option A: Using ngrok (Recommended for testing)
-1. Install ngrok: `brew install ngrok` (macOS)
-2. Run ngrok: `ngrok http 9001`
-3. Copy the public URL (e.g., `wss://abc123.ngrok.io`)
-4. Replace `localhost:9001` with `abc123.ngrok.io` in iOS app
+That's it! The script will:
+- Configure ngrok with your token
+- Start the WebSocket server
+- Start ngrok tunnel
+- Display the connection info
 
-#### Option B: Port Forwarding
-1. Configure your router to forward port 9001 to your machine
-2. Use your public IP: `ws://YOUR_PUBLIC_IP:9001/ws`
+## What You'll See
 
-#### Option C: Deploy to Cloud
-Deploy the server to a cloud provider with a public IP
+The server displays:
+- 🔐 Authentication UUID (changes each run)
+- 📱 QR code for easy scanning
+- 📡 Connection instructions
+- 🌐 ngrok public URL for remote access
 
-## iOS App Setup
+## iOS App Connection
 
-### 1. Configure Connection
-1. Open the iOS app
-2. Tap the gear icon (⚙️)
+1. Open your iOS app
+2. Tap the ⚙️ settings icon
 3. Enter:
-   - **WebSocket URL**: Your server URL (e.g., `wss://abc123.ngrok.io/ws`)
-   - **Authentication UUID**: The UUID shown by the server
-4. Tap "Save"
+   - **WebSocket URL**: The ngrok URL (use `wss://` not `https://`)
+   - **Auth UUID**: Scan the QR code or copy from terminal
+4. Save and connect
 
-### 2. Connect
-1. Tap "Connect" button
-2. The app will authenticate automatically
-3. Status indicator:
-   - 🔴 Red: Disconnected
-   - 🟠 Orange: Connected, authenticating
-   - 🟢 Green: Authenticated and ready
+## Manual Commands
 
-## Security Notes
+If you prefer to run things separately:
 
-- The server enforces single-client policy
-- Only one client can connect at a time
-- Server auto-shuts down when client disconnects
-- UUID changes each time the server starts
+```bash
+# Terminal 1: Run server
+cargo run
 
-## Testing
+# Terminal 2: Start ngrok
+ngrok http 9001
+```
 
-1. Start the server and note the UUID
-2. Configure the iOS app with the server URL and UUID
-3. Connect from the iOS app
-4. Send test messages - they should echo back
-5. Disconnect - server will shut down automatically
+## Troubleshooting
+
+- **Port already in use**: The script automatically kills processes on port 9001
+- **Server won't stop**: Use `Ctrl+C` (not `Ctrl+Z`)
+- **Kill stuck server**: `./kill_server.sh`
