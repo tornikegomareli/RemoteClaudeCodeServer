@@ -27,26 +27,28 @@ cp .env.example .env
 
 That's it! The script will:
 - Configure ngrok with your token
-- Start the WebSocket server
-- Start ngrok tunnel
-- Display the connection info
+- Start ngrok tunnel and get the public URL
+- Start the WebSocket server with a QR code containing both UUID and URL
+- Display all connection info
 
 ## What You'll See
 
 The server displays:
 - 🔐 Authentication UUID (changes each run)
-- 📱 QR code for easy scanning
-- 📡 Connection instructions
-- 🌐 ngrok public URL for remote access
+- 📱 QR code containing BOTH UUID and URL
+- 📡 Local and remote connection URLs
+- ✨ All connection info in one place
 
 ## iOS App Connection
 
+### Quick Connect (Recommended)
 1. Open your iOS app
 2. Tap the ⚙️ settings icon
-3. Enter:
-   - **WebSocket URL**: The ngrok URL (use `wss://` not `https://`)
-   - **Auth UUID**: Scan the QR code or copy from terminal
-4. Save and connect
+3. Tap "Scan QR Code"
+4. Point at the QR code in terminal
+5. Tap "Connect" - that's it!
+
+The QR code automatically provides both the UUID and ngrok URL.
 
 ## Manual Commands
 
