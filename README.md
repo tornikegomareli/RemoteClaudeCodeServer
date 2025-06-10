@@ -1,6 +1,6 @@
 # RemoteClaudeCode Server
 
-WebSocket server with UUID authentication for remote iOS client connection.
+Remote Claude Code WebSocket server
 
 ## Prerequisites
 
@@ -13,7 +13,6 @@ WebSocket server with UUID authentication for remote iOS client connection.
 ```bash
 git clone <repo-url>
 cd RemoteClaudeCodeServer
-cp .env.example .env
 ```
 
 2. **Add your ngrok token to `.env`:**
@@ -34,10 +33,10 @@ That's it! The script will:
 ## What You'll See
 
 The server displays:
-- 🔐 Authentication UUID (changes each run)
-- 📱 QR code containing BOTH UUID and URL
-- 📡 Local and remote connection URLs
-- ✨ All connection info in one place
+- Authentication UUID (changes each run)
+- QR code containing BOTH UUID and URL
+- Local and remote connection URLs
+- All connection info in one place
 
 ## iOS App Connection
 
