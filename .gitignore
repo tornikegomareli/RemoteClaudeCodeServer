@@ -54,3 +54,10 @@ flamegraph.svg
 __pycache__/
 *.pyc
 test_client.py
+
+# Claude configuration
+.claude/
+
+# Project documentation (local only)
+PLANNING.md
+TASK.md
