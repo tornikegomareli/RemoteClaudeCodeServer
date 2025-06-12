@@ -1,19 +1,29 @@
 use std::time::Duration;
+use std::path::PathBuf;
 
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub auth_timeout: Duration,
     pub remote_url: Option<String>,
+    pub repo_paths: Vec<PathBuf>,
 }
 
 impl Default for ServerConfig {
     fn default() -> Self {
+        let repo_paths = std::env::var("REPO_PATHS")
+            .unwrap_or_default()
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| PathBuf::from(s.trim()))
+            .collect();
+
         Self {
             host: "127.0.0.1".to_string(),
             port: 9001,
             auth_timeout: Duration::from_secs(5),
             remote_url: std::env::var("REMOTE_URL").ok(),
+            repo_paths,
         }
     }
 }

@@ -9,6 +9,7 @@ use colored::Colorize;
 
 use crate::auth::AuthManager;
 use crate::config::ServerConfig;
+use crate::messages::{ClientMessage, ServerMessage};
 use crate::types::{AuthMethod, AuthStatus, ClientInfo, ServerState};
 use crate::ui::TerminalUI;
 
@@ -248,16 +249,25 @@ impl ConnectionHandler {
         >,
         addr: SocketAddr,
         state: ServerState,
-        client_id: String,
+        _client_id: String,
     ) {
         while let Some(msg) = ws_receiver.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
                     TerminalUI::print_message_received(&addr.to_string(), &text);
 
-                    if let Err(e) = ws_sender.send(Message::Text(text.clone())).await {
-                        error!("Failed to echo message: {}", e);
-                        break;
+                    // Parse client message
+                    match serde_json::from_str::<ClientMessage>(&text) {
+                        Ok(client_msg) => {
+                            self.handle_client_message(client_msg, &mut ws_sender, &state).await;
+                        }
+                        Err(_) => {
+                            // For backward compatibility, echo plain text
+                            if let Err(e) = ws_sender.send(Message::Text(text.clone())).await {
+                                error!("Failed to echo message: {}", e);
+                                break;
+                            }
+                        }
                     }
                 }
                 Ok(Message::Close(_)) => {
@@ -282,5 +292,51 @@ impl ConnectionHandler {
         
         // Don't shutdown - allow reconnection
         println!("\n{}", "🔄 Server remains active. Client can reconnect using their token.".bright_yellow());
+    }
+
+    async fn handle_client_message(
+        &self,
+        msg: ClientMessage,
+        ws_sender: &mut futures_util::stream::SplitSink<
+            tokio_tungstenite::WebSocketStream<TcpStream>,
+            Message,
+        >,
+        state: &ServerState,
+    ) {
+        let response = match msg {
+            ClientMessage::ListRepositories => {
+                let repos = state.repositories.read().await;
+                ServerMessage::RepositoryList {
+                    repositories: repos.clone(),
+                }
+            }
+            ClientMessage::SelectRepository { path } => {
+                let repos = state.repositories.read().await;
+                if let Some(repo) = repos.iter().find(|r| r.path.to_string_lossy() == path) {
+                    let mut selected = state.selected_repository.write().await;
+                    *selected = Some(repo.clone());
+                    println!("📂 Selected repository: {}", repo.name.bright_green());
+                    ServerMessage::RepositorySelected {
+                        repository: repo.clone(),
+                    }
+                } else {
+                    ServerMessage::Error {
+                        message: format!("Repository not found: {}", path),
+                    }
+                }
+            }
+            ClientMessage::Prompt { text } => {
+                // TODO: Implement Claude CLI integration
+                ServerMessage::Response {
+                    text: format!("Echo: {}", text),
+                }
+            }
+        };
+
+        if let Ok(json) = serde_json::to_string(&response) {
+            if let Err(e) = ws_sender.send(Message::Text(json)).await {
+                error!("Failed to send response: {}", e);
+            }
+        }
     }
 }

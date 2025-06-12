@@ -5,6 +5,7 @@ use tokio::sync::RwLock;
 use crate::auth::AuthManager;
 use crate::config::ServerConfig;
 use crate::connection::ConnectionHandler;
+use crate::repository::scan_repositories;
 use crate::types::ServerState;
 use crate::ui::TerminalUI;
 
@@ -32,10 +33,15 @@ impl WebSocketServer {
 
         let listener = TcpListener::bind(&self.config.bind_address()).await?;
 
+        let repositories = scan_repositories(&self.config.repo_paths);
+        println!("📁 Found {} repositories", repositories.len());
+
         let state = ServerState {
             auth_uuid: self.auth_manager.get_uuid().to_string(),
             connected_client: Arc::new(RwLock::new(None)),
             reconnection_tokens: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            repositories: Arc::new(RwLock::new(repositories)),
+            selected_repository: Arc::new(RwLock::new(None)),
         };
 
         while let Ok((stream, addr)) = listener.accept().await {
@@ -57,6 +63,7 @@ impl Clone for ServerConfig {
             port: self.port,
             auth_timeout: self.auth_timeout,
             remote_url: self.remote_url.clone(),
+            repo_paths: self.repo_paths.clone(),
         }
     }
 }

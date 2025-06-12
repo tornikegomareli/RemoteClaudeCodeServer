@@ -2,12 +2,15 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use crate::repository::Repository;
 
 #[derive(Clone)]
 pub struct ServerState {
     pub auth_uuid: String,
     pub connected_client: Arc<RwLock<Option<ClientInfo>>>,
     pub reconnection_tokens: Arc<RwLock<HashMap<String, String>>>, // token -> client_id
+    pub repositories: Arc<RwLock<Vec<Repository>>>,
+    pub selected_repository: Arc<RwLock<Option<Repository>>>,
 }
 
 #[derive(Clone)]
