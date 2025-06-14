@@ -64,8 +64,6 @@ PLANNING.md
 TASK.md
 iOS_IMPLEMENTATION_GUIDE.md
 
-# Xcode user state
-*.xcuserstate
 specs
 # Xcode user-specific files
 *.xcuserstate

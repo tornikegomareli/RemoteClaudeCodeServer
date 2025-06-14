@@ -10,3 +10,11 @@ import SwiftUI
 // This file now redirects to ClaudeConnectApp
 // The actual app implementation is in ClaudeConnectApp.swift
 typealias TestingWebSocketClientApp = ClaudeConnectApp
+@main
+struct TestingWebSocketClientApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ChatView()
+        }
+    }
+}
