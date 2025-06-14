@@ -66,3 +66,10 @@ iOS_IMPLEMENTATION_GUIDE.md
 
 # Xcode user state
 *.xcuserstate
+
+# Xcode user-specific files
+*.xcuserstate
+xcuserdata/
+
+# Rust coding standards specs
+specs/
