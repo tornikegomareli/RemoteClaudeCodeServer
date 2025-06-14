@@ -61,3 +61,10 @@ test_client.py
 # Project documentation (local only)
 PLANNING.md
 TASK.md
+
+# Xcode user-specific files
+*.xcuserstate
+xcuserdata/
+
+# Rust coding standards specs
+specs/
