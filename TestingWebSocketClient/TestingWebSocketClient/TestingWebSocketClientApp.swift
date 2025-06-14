@@ -7,11 +7,6 @@
 
 import SwiftUI
 
-@main
-struct TestingWebSocketClientApp: App {
-  var body: some Scene {
-      WindowGroup {
-          ContentView()
-      }
-  }
-}
+// This file now redirects to ClaudeConnectApp
+// The actual app implementation is in ClaudeConnectApp.swift
+typealias TestingWebSocketClientApp = ClaudeConnectApp
