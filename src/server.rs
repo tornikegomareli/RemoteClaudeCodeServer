@@ -17,7 +17,7 @@ pub struct WebSocketServer {
 impl WebSocketServer {
     pub fn new(config: ServerConfig) -> Self {
         let auth_manager = AuthManager::new();
-        
+
         Self {
             config,
             auth_manager,
@@ -28,7 +28,7 @@ impl WebSocketServer {
         TerminalUI::display_startup_screen(
             self.auth_manager.get_uuid(),
             &self.config.websocket_url(),
-            self.config.remote_url.as_deref()
+            self.config.remote_url.as_deref(),
         );
 
         let listener = TcpListener::bind(&self.config.bind_address()).await?;
