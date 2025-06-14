@@ -1,8 +1,8 @@
+use crate::repository::Repository;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::repository::Repository;
 
 #[derive(Clone)]
 pub struct ServerState {

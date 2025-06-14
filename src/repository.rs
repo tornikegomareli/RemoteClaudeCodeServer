@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Repository {
@@ -9,7 +9,7 @@ pub struct Repository {
 
 pub fn scan_repositories(paths: &[PathBuf]) -> Vec<Repository> {
     let mut repositories = Vec::new();
-    
+
     for base_path in paths {
         if base_path.exists() && base_path.is_dir() {
             // Only scan subdirectories, not the base path itself
@@ -28,7 +28,7 @@ pub fn scan_repositories(paths: &[PathBuf]) -> Vec<Repository> {
             }
         }
     }
-    
+
     repositories.sort_by(|a, b| a.name.cmp(&b.name));
     repositories
 }

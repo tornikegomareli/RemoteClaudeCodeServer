@@ -57,10 +57,15 @@ test_client.py
 
 # Claude configuration
 .claude/
+CLAUDE.md
 
 # Project documentation (local only)
 PLANNING.md
 TASK.md
+iOS_IMPLEMENTATION_GUIDE.md
+
+# Xcode user state
+*.xcuserstate
 
 # Xcode user-specific files
 *.xcuserstate

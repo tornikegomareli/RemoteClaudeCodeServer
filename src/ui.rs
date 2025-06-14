@@ -65,11 +65,7 @@ impl TerminalUI {
             server_url.bright_blue()
         );
         if let Some(url) = remote_url {
-            println!(
-                "   {} {}",
-                "Remote URL:".bright_white(),
-                url.bright_green()
-            );
+            println!("   {} {}", "Remote URL:".bright_white(), url.bright_green());
         }
         println!(
             "   {} {}",
@@ -84,20 +80,27 @@ impl TerminalUI {
     }
 
     fn print_qr_code(auth_uuid: &str, remote_url: Option<&str>) {
-        println!("\n{}", "📱 QR Code (contains connection info):".bright_green().bold());
-        
+        println!(
+            "\n{}",
+            "📱 QR Code (contains connection info):"
+                .bright_green()
+                .bold()
+        );
+
         // Create JSON with UUID and URL if available
         let qr_data = if let Some(url) = remote_url {
             json!({
                 "uuid": auth_uuid,
                 "url": url,
                 "version": "1.0"
-            }).to_string()
+            })
+            .to_string()
         } else {
             json!({
                 "uuid": auth_uuid,
                 "version": "1.0"
-            }).to_string()
+            })
+            .to_string()
         };
 
         match QrCode::new(&qr_data) {
