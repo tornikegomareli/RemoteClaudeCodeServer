@@ -1,5 +1,5 @@
-use uuid::Uuid;
 use crate::types::AuthMethod;
+use uuid::Uuid;
 
 pub struct AuthManager {
     auth_uuid: String,

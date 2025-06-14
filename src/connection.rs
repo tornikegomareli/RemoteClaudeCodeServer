@@ -1,11 +1,11 @@
+use colored::Colorize;
 use futures_util::{SinkExt, StreamExt};
 use log::error;
+use serde_json::json;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 use tokio::time::timeout;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
-use serde_json::json;
-use colored::Colorize;
 
 use crate::auth::AuthManager;
 use crate::config::ServerConfig;
@@ -22,12 +22,7 @@ impl ConnectionHandler {
         Self { config }
     }
 
-    pub async fn handle_connection(
-        &self,
-        stream: TcpStream,
-        addr: SocketAddr,
-        state: ServerState,
-    ) {
+    pub async fn handle_connection(&self, stream: TcpStream, addr: SocketAddr, state: ServerState) {
         TerminalUI::print_client_connected(&addr.to_string());
 
         let ws_stream = match accept_async(stream).await {
@@ -45,9 +40,11 @@ impl ConnectionHandler {
         match auth_result {
             Ok(Some(Ok(Message::Text(auth_message)))) => {
                 let auth_message = auth_message.trim();
-                
+
                 // Try to parse as JSON first (for reconnection token)
-                let auth_method = if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(auth_message) {
+                let auth_method = if let Ok(json_value) =
+                    serde_json::from_str::<serde_json::Value>(auth_message)
+                {
                     if let Some(token) = json_value.get("token").and_then(|v| v.as_str()) {
                         AuthMethod::ReconnectionToken(token.to_string())
                     } else {
@@ -58,7 +55,8 @@ impl ConnectionHandler {
                     AuthMethod::InitialUuid(auth_message.to_string())
                 };
 
-                self.handle_auth(auth_method, addr, state, ws_sender, ws_receiver).await;
+                self.handle_auth(auth_method, addr, state, ws_sender, ws_receiver)
+                    .await;
             }
             Ok(_) => {
                 self.handle_auth_failure(
@@ -112,7 +110,7 @@ impl ConnectionHandler {
                     // Generate tokens and client info
                     let client_id = AuthManager::generate_client_id();
                     let reconnection_token = AuthManager::generate_reconnection_token();
-                    
+
                     let client_info = ClientInfo {
                         addr,
                         client_id: client_id.clone(),
@@ -143,8 +141,30 @@ impl ConnectionHandler {
                         return;
                     }
 
-                    self.handle_authenticated_client(ws_sender, ws_receiver, addr, state, client_id)
-                        .await;
+                    // Send repository list immediately after authentication
+                    {
+                        let repos = state.repositories.read().await;
+                        let repo_list_msg = ServerMessage::RepositoryList {
+                            repositories: repos.clone(),
+                        };
+
+                        if let Ok(json) = serde_json::to_string(&repo_list_msg) {
+                            if let Err(e) = ws_sender.send(Message::Text(json)).await {
+                                error!("Failed to send repository list: {}", e);
+                            } else {
+                                println!("📋 Sent {} repositories to client", repos.len());
+                            }
+                        }
+                    }
+
+                    self.handle_authenticated_client(
+                        ws_sender,
+                        ws_receiver,
+                        addr,
+                        state,
+                        client_id,
+                    )
+                    .await;
                 } else {
                     self.handle_auth_failure(
                         &mut ws_sender,
@@ -166,8 +186,8 @@ impl ConnectionHandler {
                     // Check if another client is connected
                     let can_reconnect = {
                         let connected = state.connected_client.read().await;
-                        connected.is_none() || 
-                        (connected.as_ref().map(|c| &c.client_id) == Some(&client_id))
+                        connected.is_none()
+                            || (connected.as_ref().map(|c| &c.client_id) == Some(&client_id))
                     };
 
                     if !can_reconnect {
@@ -206,8 +226,30 @@ impl ConnectionHandler {
                         return;
                     }
 
-                    self.handle_authenticated_client(ws_sender, ws_receiver, addr, state, client_id)
-                        .await;
+                    // Send repository list immediately after authentication
+                    {
+                        let repos = state.repositories.read().await;
+                        let repo_list_msg = ServerMessage::RepositoryList {
+                            repositories: repos.clone(),
+                        };
+
+                        if let Ok(json) = serde_json::to_string(&repo_list_msg) {
+                            if let Err(e) = ws_sender.send(Message::Text(json)).await {
+                                error!("Failed to send repository list: {}", e);
+                            } else {
+                                println!("📋 Sent {} repositories to client", repos.len());
+                            }
+                        }
+                    }
+
+                    self.handle_authenticated_client(
+                        ws_sender,
+                        ws_receiver,
+                        addr,
+                        state,
+                        client_id,
+                    )
+                    .await;
                 } else {
                     self.handle_auth_failure(
                         &mut ws_sender,
@@ -259,7 +301,8 @@ impl ConnectionHandler {
                     // Parse client message
                     match serde_json::from_str::<ClientMessage>(&text) {
                         Ok(client_msg) => {
-                            self.handle_client_message(client_msg, &mut ws_sender, &state).await;
+                            self.handle_client_message(client_msg, &mut ws_sender, &state)
+                                .await;
                         }
                         Err(_) => {
                             // For backward compatibility, echo plain text
@@ -289,9 +332,12 @@ impl ConnectionHandler {
         }
 
         TerminalUI::print_client_disconnected(&addr.to_string());
-        
+
         // Don't shutdown - allow reconnection
-        println!("\n{}", "🔄 Server remains active. Client can reconnect using their token.".bright_yellow());
+        println!(
+            "\n{}",
+            "🔄 Server remains active. Client can reconnect using their token.".bright_yellow()
+        );
     }
 
     async fn handle_client_message(

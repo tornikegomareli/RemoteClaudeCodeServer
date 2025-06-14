@@ -1,5 +1,5 @@
-use std::time::Duration;
 use std::path::PathBuf;
+use std::time::Duration;
 
 pub struct ServerConfig {
     pub host: String,
