@@ -22,13 +22,6 @@ class DependencyContainer {
         repositoryService: repositoryService
     )
     
-    lazy var chatViewModel = ChatViewModel(
-        webSocketClient: webSocketClient,
-        messageService: messageService,
-        repositoryService: repositoryService,
-        connectionViewModel: connectionViewModel
-    )
-    
     lazy var repositoryViewModel = RepositoryViewModel(
         webSocketClient: webSocketClient,
         repositoryService: repositoryService,
