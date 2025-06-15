@@ -146,55 +146,6 @@ struct RepositorySelector: View {
     }
 }
 
-/// Repository row view
-struct RepositoryRow: View {
-    let repository: Repository
-    let isSelected: Bool
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: AppTheme.Spacing.medium) {
-                // Icon
-                Image(systemName: isSelected ? "folder.fill" : "folder")
-                    .font(.system(size: 24))
-                    .foregroundColor(isSelected ? AppTheme.Colors.primary : AppTheme.Colors.secondaryLabel)
-                    .frame(width: 40)
-                
-                // Info
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.xxSmall) {
-                    Text(repository.name)
-                        .font(AppTheme.Typography.headline)
-                        .foregroundColor(AppTheme.Colors.label)
-                    
-                    Text(repository.path)
-                        .font(AppTheme.Typography.caption)
-                        .foregroundColor(AppTheme.Colors.secondaryLabel)
-                        .lineLimit(1)
-                }
-                
-                Spacer()
-                
-                // Checkmark
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(AppTheme.Colors.primary)
-                }
-            }
-            .padding(.horizontal, AppTheme.Spacing.medium)
-            .padding(.vertical, AppTheme.Spacing.small)
-            .background(
-                isSelected ? AppTheme.Colors.primary.opacity(0.1) : Color.clear
-            )
-            .cornerRadius(AppTheme.CornerRadius.medium)
-            .padding(.horizontal, AppTheme.Spacing.medium)
-            .padding(.vertical, AppTheme.Spacing.xxSmall)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
 /// Repository model
 struct Repository: Identifiable, Codable, Hashable {
     let id = UUID()
