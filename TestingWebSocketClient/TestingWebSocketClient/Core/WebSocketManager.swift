@@ -102,16 +102,25 @@ class WebSocketManager: ObservableObject {
         endBackgroundTask()
         stopPingTimer()
         
-        // Always attempt to reconnect when we have credentials
-        // The connection might have been dropped while in background
+        // Check if we need to reconnect
         if !reconnectionToken.isEmpty && !serverURL.isEmpty {
-            // Force reconnect regardless of isConnected state
-            connectionStatus = .reconnecting
-            addLog(.info, "Reconnecting to server...", category: .connection)
+            // Only reconnect if we're not already connected or connecting
+            switch connectionStatus {
+            case .disconnected, .failed:
+                addLog(.info, "App returning to foreground - attempting reconnection", category: .connection)
+                connect()
+            case .authenticated:
+                // Already connected, just verify the connection
+                addLog(.info, "App returning to foreground - verifying connection", category: .connection)
+                testConnection()
+            case .connecting, .authenticating, .reconnecting:
+                // Already in the process of connecting
+                addLog(.info, "App returning to foreground - connection already in progress", category: .connection)
+            }
+        } else if !authUUID.isEmpty && !serverURL.isEmpty {
+            // Have initial auth credentials but no reconnection token
+            addLog(.info, "App returning to foreground - attempting initial connection", category: .connection)
             connect()
-        } else if isConnected && webSocketTask != nil {
-            // If we think we're connected, send a ping to verify
-            testConnection()
         }
     }
     
@@ -237,7 +246,7 @@ class WebSocketManager: ObservableObject {
         webSocketTask = session.webSocketTask(with: url)
         webSocketTask?.resume()
         
-        isConnected = true
+        // Don't set isConnected until we're authenticated
         connectionStatus = .authenticating
         
         if !reconnectionToken.isEmpty && !clientId.isEmpty {
@@ -389,6 +398,7 @@ class WebSocketManager: ObservableObject {
             // Handle auth messages (no type field)
             if let status = json["status"] as? String {
                 if status == "AUTH_SUCCESS" {
+                    isConnected = true
                     connectionStatus = .authenticated
                     
                     if let reconnectionToken = json["reconnection_token"] as? String {
@@ -402,6 +412,9 @@ class WebSocketManager: ObservableObject {
                     addLog(.success, "Authentication successful", category: .authentication)
                     
                     NotificationCenter.default.post(name: .webSocketAuthenticated, object: nil)
+                    
+                    // Start ping timer after successful authentication
+                    startPingTimer()
                 }
                 return
             }
@@ -409,6 +422,7 @@ class WebSocketManager: ObservableObject {
         
         // Handle plain text messages
         if text == "AUTH_SUCCESS" {
+            isConnected = true
             connectionStatus = .authenticated
             addLog(.success, "Authentication successful", category: .authentication)
             NotificationCenter.default.post(name: .webSocketAuthenticated, object: nil)
@@ -483,9 +497,9 @@ class WebSocketManager: ObservableObject {
         if !reconnectionToken.isEmpty {
             // Connection error during reconnection attempt
             connectionStatus = .failed("Cannot reach server")
-            clearStoredCredentials() // Clear invalid token
-            addLog(.warning, "Unable to reconnect. Server may be offline or restarted. Please scan QR code when server is running.", category: .connection)
-            NotificationCenter.default.post(name: .serverRestartDetected, object: nil)
+            // Don't clear credentials immediately - server might just be temporarily unavailable
+            addLog(.warning, "Unable to reconnect. Server may be offline. Will retry when server is available.", category: .connection)
+            // Only post notification if we've tried multiple times or got specific auth errors
         } else {
             connectionStatus = .failed(error.localizedDescription)
             addLog(.error, "Connection failed: \(error.localizedDescription)", category: .connection)

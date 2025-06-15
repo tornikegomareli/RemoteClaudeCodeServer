@@ -20,16 +20,12 @@ struct ClaudeConnectApp: App {
                 .onChange(of: scenePhase) { _, newPhase in
                     switch newPhase {
                     case .active:
-                        // App became active
-                        if !appState.isConnected && 
-                           !appState.webSocketManager.reconnectionToken.isEmpty {
-                            appState.webSocketManager.addLog(.info, "App became active, checking connection", category: .general)
-                            appState.webSocketManager.connect()
-                        }
+                        // App became active - WebSocketManager will handle reconnection in appWillEnterForeground
+                        appState.webSocketManager.addLog(.info, "Scene became active", category: .general)
                     case .inactive:
-                        appState.webSocketManager.addLog(.info, "App became inactive", category: .general)
+                        appState.webSocketManager.addLog(.info, "Scene became inactive", category: .general)
                     case .background:
-                        appState.webSocketManager.addLog(.info, "App entered background", category: .general)
+                        appState.webSocketManager.addLog(.info, "Scene entered background", category: .general)
                     @unknown default:
                         break
                     }
@@ -53,13 +49,19 @@ struct AppContentView: View {
                 }
                 .transition(.opacity)
             } else {
-                if appState.isConnected {
+                switch appState.connectionStatus {
+                case .authenticated:
                     MainView()
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .leading).combined(with: .opacity)
                         ))
-                } else {
+                
+                case .connecting, .authenticating, .reconnecting:
+                    ReconnectingView()
+                        .transition(.opacity)
+                
+                case .disconnected, .failed:
                     OnboardingView()
                         .transition(.asymmetric(
                             insertion: .move(edge: .leading).combined(with: .opacity),
@@ -68,9 +70,58 @@ struct AppContentView: View {
                 }
             }
         }
-        .animation(AppTheme.Animation.smooth, value: appState.isConnected)
+        .animation(AppTheme.Animation.smooth, value: appState.connectionStatus)
         .onReceive(NotificationCenter.default.publisher(for: .connectionStateChanged)) { _ in
             // Handle connection state changes
+        }
+    }
+}
+
+/// View shown during reconnection attempts
+struct ReconnectingView: View {
+    @EnvironmentObject var appState: AppState
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.Colors.primary))
+            
+            VStack(spacing: 8) {
+                Text("Reconnecting...")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                
+                Text(statusMessage)
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+            
+            // Option to cancel and go to connection setup
+            Button(action: {
+                appState.webSocketManager.disconnect()
+            }) {
+                Text("Cancel")
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 20)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.Colors.background)
+    }
+    
+    private var statusMessage: String {
+        switch appState.connectionStatus {
+        case .connecting:
+            return "Establishing connection to server..."
+        case .authenticating:
+            return "Authenticating with server..."
+        case .reconnecting:
+            return "Restoring your previous session..."
+        default:
+            return "Please wait..."
         }
     }
 }
@@ -78,6 +129,7 @@ struct AppContentView: View {
 /// App-wide state management
 class AppState: ObservableObject {
     @Published var isConnected = false
+    @Published var connectionStatus: WebSocketManager.ConnectionStatus = .disconnected
     @Published var selectedRepository: Repository?
     @Published var webSocketManager = WebSocketManager()
     
@@ -93,14 +145,26 @@ class AppState: ObservableObject {
         webSocketManager.$connectionStatus
             .receive(on: DispatchQueue.main)
             .sink { [weak self] status in
+                self?.connectionStatus = status
+                
                 switch status {
                 case .authenticated:
                     self?.isConnected = true
                 case .disconnected, .failed:
                     self?.isConnected = false
-                default:
+                    self?.selectedRepository = nil
+                case .connecting, .authenticating, .reconnecting:
+                    // Keep isConnected as is during transition states
                     break
                 }
+            }
+            .store(in: &cancellables)
+        
+        // Observe isConnected changes from WebSocketManager
+        webSocketManager.$isConnected
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] connected in
+                self?.isConnected = connected
             }
             .store(in: &cancellables)
         
@@ -108,7 +172,6 @@ class AppState: ObservableObject {
         NotificationCenter.default.publisher(for: .webSocketAuthenticated)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.isConnected = true
                 NotificationCenter.default.post(name: .connectionStateChanged, object: nil)
             }
             .store(in: &cancellables)
@@ -117,7 +180,7 @@ class AppState: ObservableObject {
         NotificationCenter.default.publisher(for: .serverRestartDetected)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.isConnected = false
+                self?.selectedRepository = nil
                 NotificationCenter.default.post(name: .connectionStateChanged, object: nil)
                 NotificationCenter.default.post(name: .showConnectionSheet, object: nil)
             }
@@ -129,7 +192,7 @@ class AppState: ObservableObject {
         if !webSocketManager.serverURL.isEmpty && 
            (!webSocketManager.reconnectionToken.isEmpty || !webSocketManager.authUUID.isEmpty) {
             webSocketManager.addLog(.info, "Attempting auto-reconnect with stored credentials", category: .connection)
-            // Attempt to connect after a short delay
+            // Attempt to connect after splash screen
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 self.webSocketManager.connect()
             }
