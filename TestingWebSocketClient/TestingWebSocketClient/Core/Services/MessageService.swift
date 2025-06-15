@@ -37,6 +37,24 @@ class MessageService: ObservableObject {
             if let text = message.text {
                 return text
             }
+        case .commandsList:
+            var commandsInfo = "📝 Commands loaded:\n"
+            
+            if let predefined = message.predefinedCommands, !predefined.isEmpty {
+                commandsInfo += "• \(predefined.count) predefined commands\n"
+            }
+            
+            if let custom = message.customCommands, !custom.isEmpty {
+                commandsInfo += "• \(custom.count) custom commands for this repository"
+                
+                // List custom command names
+                let commandNames = custom.map { $0.name }.joined(separator: ", ")
+                commandsInfo += "\n  Custom: \(commandNames)"
+            } else {
+                commandsInfo += "• No custom commands for this repository"
+            }
+            
+            return commandsInfo
         }
         return nil
     }

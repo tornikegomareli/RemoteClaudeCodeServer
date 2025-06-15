@@ -151,21 +151,25 @@ struct Repository: Identifiable, Codable, Hashable {
     let id = UUID()
     let name: String
     let path: String
+    let customCommands: [SlashCommand]
     
     enum CodingKeys: String, CodingKey {
         case name
         case path
+        case customCommands = "custom_commands"
     }
     
-    init(name: String, path: String) {
+    init(name: String, path: String, customCommands: [SlashCommand] = []) {
         self.name = name
         self.path = path
+        self.customCommands = customCommands
     }
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.name = try container.decode(String.self, forKey: .name)
         self.path = try container.decode(String.self, forKey: .path)
+        self.customCommands = try container.decodeIfPresent([SlashCommand].self, forKey: .customCommands) ?? []
     }
     
     func encode(to encoder: Encoder) throws {

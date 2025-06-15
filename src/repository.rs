@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use crate::slash_commands::{SlashCommand, scan_custom_commands};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Repository {
     pub name: String,
     pub path: PathBuf,
+    pub custom_commands: Vec<SlashCommand>,
 }
 
 pub fn scan_repositories(paths: &[PathBuf]) -> Vec<Repository> {
@@ -18,9 +20,13 @@ pub fn scan_repositories(paths: &[PathBuf]) -> Vec<Repository> {
                     let path = entry.path();
                     if path.is_dir() && is_git_repository(&path) {
                         if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                            // Scan for custom commands in this repository
+                            let custom_commands = scan_custom_commands(&path);
+                            
                             repositories.push(Repository {
                                 name: name.to_string(),
                                 path: path.clone(),
+                                custom_commands,
                             });
                         }
                     }

@@ -12,6 +12,7 @@ enum ServerMessageType: String, Codable {
     case repoSelected = "repo_selected"
     case error = "error"
     case response = "response"
+    case commandsList = "commands_list"
 }
 
 struct ServerMessage: Codable {
@@ -20,4 +21,16 @@ struct ServerMessage: Codable {
     let repository: Repository?
     let message: String?
     let text: String?
+    let predefinedCommands: [SlashCommand]?
+    let customCommands: [SlashCommand]?
+    
+    enum CodingKeys: String, CodingKey {
+        case type
+        case repositories
+        case repository
+        case message
+        case text
+        case predefinedCommands = "predefined_commands"
+        case customCommands = "custom_commands"
+    }
 }

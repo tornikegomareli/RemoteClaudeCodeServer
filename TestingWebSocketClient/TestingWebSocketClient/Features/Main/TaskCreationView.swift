@@ -9,13 +9,15 @@ import SwiftUI
 
 struct TaskCreationView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var appState: AppState
     let repository: Repository?
     let onSubmit: (String) -> Void
     
     @State private var taskDescription = ""
     @FocusState private var isTextEditorFocused: Bool
-    @State private var selectedCommand: SlashCommand?
-    @State private var showCommandPicker = false
+    @State private var selectedPrompt: QuickPrompt?
+    @State private var showPromptPicker = false
+    @State private var showSlashCommands = false
     
     var body: some View {
         NavigationView {
@@ -55,10 +57,10 @@ struct TaskCreationView: View {
                             checkForSlashCommand(newValue)
                         }
                     
-                    // Selected command badge
-                    if let command = selectedCommand {
-                        CommandBadge(command: command) {
-                            selectedCommand = nil
+                    // Selected prompt badge
+                    if let prompt = selectedPrompt {
+                        PromptBadge(prompt: prompt) {
+                            selectedPrompt = nil
                         }
                         .padding(.horizontal, AppTheme.Spacing.medium)
                     }
@@ -101,10 +103,16 @@ struct TaskCreationView: View {
                     .disabled(taskDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-            .sheet(isPresented: $showCommandPicker) {
-                CommandPicker { command in
-                    selectedCommand = command
-                    showCommandPicker = false
+            .sheet(isPresented: $showPromptPicker) {
+                PromptPicker { prompt in
+                    selectedPrompt = prompt
+                    showPromptPicker = false
+                }
+            }
+            .sheet(isPresented: $showSlashCommands) {
+                SlashCommandsView(availableCommands: appState.webSocketManager.availableCommands) { command in
+                    insertSlashCommand(command)
+                    showSlashCommands = false
                 }
             }
             .onAppear {
@@ -116,7 +124,7 @@ struct TaskCreationView: View {
     private var keyboardToolbar: some View {
         HStack(spacing: AppTheme.Spacing.medium) {
             Button(action: {
-                showCommandPicker = true
+                showSlashCommands = true
             }) {
                 Label("Commands", systemImage: "slash.circle")
                     .font(AppTheme.Typography.callout)
@@ -141,12 +149,9 @@ struct TaskCreationView: View {
     }
     
     private func checkForSlashCommand(_ text: String) {
-        if text.hasPrefix("/") {
-            let command = String(text.dropFirst()).split(separator: " ").first.map(String.init) ?? ""
-            if let slashCommand = SlashCommand.allCases.first(where: { $0.rawValue == command }) {
-                selectedCommand = slashCommand
-                taskDescription = String(text.dropFirst(command.count + 1)).trimmingCharacters(in: .whitespaces)
-            }
+        if text.hasPrefix("/") && showSlashCommands == false {
+            // Show slash commands picker when user types "/"
+            showSlashCommands = true
         }
     }
     
@@ -160,13 +165,25 @@ struct TaskCreationView: View {
         taskDescription += action.text
     }
     
+    private func insertSlashCommand(_ command: SlashCommand) {
+        let impact = UIImpactFeedbackGenerator(style: .light)
+        impact.impactOccurred()
+        
+        // Replace text up to current position with the command
+        if taskDescription.hasPrefix("/") {
+            taskDescription = command.name + " "
+        } else {
+            taskDescription = command.name + " " + taskDescription
+        }
+    }
+    
     private func submitTask() {
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
         
         var fullTask = taskDescription
-        if let command = selectedCommand {
-            fullTask = "/\(command.rawValue) " + fullTask
+        if let prompt = selectedPrompt {
+            fullTask = prompt.description + ": " + fullTask
         }
         
         onSubmit(fullTask)
@@ -223,8 +240,8 @@ struct QuickActionChip: View {
     }
 }
 
-/// Slash command enum
-enum SlashCommand: String, CaseIterable, Identifiable {
+/// Quick prompt enum
+enum QuickPrompt: String, CaseIterable, Identifiable {
     case explain = "explain"
     case fix = "fix"
     case test = "test"
@@ -257,15 +274,15 @@ enum SlashCommand: String, CaseIterable, Identifiable {
     }
 }
 
-/// Command badge
-struct CommandBadge: View {
-    let command: SlashCommand
+/// Prompt badge
+struct PromptBadge: View {
+    let prompt: QuickPrompt
     let onRemove: () -> Void
     
     var body: some View {
         HStack(spacing: AppTheme.Spacing.xSmall) {
-            Image(systemName: command.icon)
-            Text("/" + command.rawValue)
+            Image(systemName: prompt.icon)
+            Text(prompt.rawValue.capitalized)
                 .font(AppTheme.Typography.callout)
             
             Button(action: onRemove) {
@@ -281,29 +298,29 @@ struct CommandBadge: View {
     }
 }
 
-/// Command picker
-struct CommandPicker: View {
+/// Prompt picker
+struct PromptPicker: View {
     @Environment(\.dismiss) private var dismiss
-    let onSelect: (SlashCommand) -> Void
+    let onSelect: (QuickPrompt) -> Void
     
     var body: some View {
         NavigationView {
-            List(SlashCommand.allCases) { command in
+            List(QuickPrompt.allCases) { prompt in
                 Button(action: {
-                    onSelect(command)
+                    onSelect(prompt)
                 }) {
                     HStack(spacing: AppTheme.Spacing.medium) {
-                        Image(systemName: command.icon)
+                        Image(systemName: prompt.icon)
                             .font(.system(size: 22))
                             .foregroundColor(AppTheme.Colors.primary)
                             .frame(width: 30)
                         
                         VStack(alignment: .leading, spacing: AppTheme.Spacing.xxSmall) {
-                            Text("/" + command.rawValue)
+                            Text(prompt.rawValue.capitalized)
                                 .font(AppTheme.Typography.headline)
                                 .foregroundColor(AppTheme.Colors.label)
                             
-                            Text(command.description)
+                            Text(prompt.description)
                                 .font(AppTheme.Typography.caption)
                                 .foregroundColor(AppTheme.Colors.secondaryLabel)
                         }
@@ -314,7 +331,7 @@ struct CommandPicker: View {
                 }
             }
             .listStyle(PlainListStyle())
-            .navigationTitle("Slash Commands")
+            .navigationTitle("Quick Prompts")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -327,8 +344,73 @@ struct CommandPicker: View {
     }
 }
 
+/// Slash commands view
+struct SlashCommandsView: View {
+    @Environment(\.dismiss) private var dismiss
+    let availableCommands: [SlashCommand]
+    let onSelect: (SlashCommand) -> Void
+    
+    var body: some View {
+        NavigationView {
+            if availableCommands.isEmpty {
+                VStack(spacing: AppTheme.Spacing.large) {
+                    Image(systemName: "slash.circle")
+                        .font(.system(size: 60, weight: .light))
+                        .foregroundColor(AppTheme.Colors.tertiaryLabel)
+                    
+                    Text("No commands available")
+                        .font(AppTheme.Typography.headline)
+                        .foregroundColor(AppTheme.Colors.secondaryLabel)
+                    
+                    Text("Select a repository to see available commands")
+                        .font(AppTheme.Typography.body)
+                        .foregroundColor(AppTheme.Colors.tertiaryLabel)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, AppTheme.Spacing.large)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppTheme.Colors.background)
+            } else {
+                List(availableCommands) { command in
+                    Button(action: {
+                        onSelect(command)
+                    }) {
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.xxSmall) {
+                            Text(command.name)
+                                .font(AppTheme.Typography.headline)
+                                .foregroundColor(AppTheme.Colors.label)
+                            
+                            Text(command.description)
+                                .font(AppTheme.Typography.caption)
+                                .foregroundColor(AppTheme.Colors.secondaryLabel)
+                            
+                            if let usage = command.usage {
+                                Text("Usage: \(usage)")
+                                    .font(AppTheme.Typography.caption2)
+                                    .foregroundColor(AppTheme.Colors.tertiaryLabel)
+                            }
+                        }
+                        .padding(.vertical, AppTheme.Spacing.xxSmall)
+                    }
+                }
+                .listStyle(PlainListStyle())
+            }
+        }
+        .navigationTitle("Slash Commands")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Cancel") {
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
 #Preview {
     TaskCreationView(repository: Repository.mockData.first) { task in
         print("New task: \(task)")
     }
+    .environmentObject(AppState())
 }

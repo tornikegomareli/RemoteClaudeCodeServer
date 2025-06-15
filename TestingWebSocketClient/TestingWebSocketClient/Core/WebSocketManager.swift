@@ -20,6 +20,8 @@ class WebSocketManager: ObservableObject {
     @Published var reconnectionToken = UserDefaults.standard.string(forKey: "reconnectionToken") ?? ""
     @Published var clientId = UserDefaults.standard.string(forKey: "clientId") ?? ""
     @Published var repositories: [Repository] = []
+    @Published var availableCommands: [SlashCommand] = []
+    @Published var customCommands: [SlashCommand] = []
     
     private var webSocketTask: URLSessionWebSocketTask?
     private var cancellables = Set<AnyCancellable>()
@@ -205,6 +207,8 @@ class WebSocketManager: ObservableObject {
         saveSettings()
         logs.removeAll()
         repositories.removeAll()
+        availableCommands.removeAll()
+        customCommands.removeAll()
     }
     
     func connect() {
@@ -384,6 +388,8 @@ class WebSocketManager: ObservableObject {
                     handleRepositoryList(json)
                 case "repo_selected":
                     handleRepositorySelected(json)
+                case "commands_list":
+                    handleCommandsList(json)
                 case "error":
                     handleErrorMessage(json)
                 default:
@@ -480,9 +486,45 @@ class WebSocketManager: ObservableObject {
     }
     
     private func handleRepositorySelected(_ json: [String: Any]) {
-        if let path = json["path"] as? String {
-            addLog(.success, "Repository selected: \(path)", category: .repository)
+        if let repoData = json["repository"] as? [String: Any],
+           let name = repoData["name"] as? String {
+            addLog(.success, "Repository selected: \(name)", category: .repository)
         }
+    }
+    
+    private func handleCommandsList(_ json: [String: Any]) {
+        // Parse predefined commands
+        if let predefinedData = json["predefined_commands"] as? [[String: Any]] {
+            let predefined = predefinedData.compactMap { cmdDict -> SlashCommand? in
+                guard let data = try? JSONSerialization.data(withJSONObject: cmdDict),
+                      let command = try? JSONDecoder().decode(SlashCommand.self, from: data) else { return nil }
+                return command
+            }
+            availableCommands = predefined
+        }
+        
+        // Parse custom commands
+        if let customData = json["custom_commands"] as? [[String: Any]] {
+            let custom = customData.compactMap { cmdDict -> SlashCommand? in
+                guard let data = try? JSONSerialization.data(withJSONObject: cmdDict),
+                      let command = try? JSONDecoder().decode(SlashCommand.self, from: data) else { return nil }
+                return command
+            }
+            customCommands = custom
+            
+            if !custom.isEmpty {
+                addLog(.info, "Loaded \(custom.count) custom commands for this repository", category: .repository)
+                for cmd in custom {
+                    addLog(.info, "Custom command: \(cmd.name) - \(cmd.description)", category: .repository)
+                }
+            }
+        }
+        
+        // Merge all commands
+        availableCommands = availableCommands + customCommands
+        
+        // Post notification for commands update
+        NotificationCenter.default.post(name: .commandsListUpdated, object: availableCommands)
     }
     
     private func handleErrorMessage(_ json: [String: Any]) {
@@ -553,4 +595,5 @@ extension Notification.Name {
     static let webSocketAuthenticated = Notification.Name("webSocketAuthenticated")
     static let repositoryListUpdated = Notification.Name("repositoryListUpdated")
     static let serverRestartDetected = Notification.Name("serverRestartDetected")
+    static let commandsListUpdated = Notification.Name("commandsListUpdated")
 }

@@ -10,6 +10,7 @@ use tokio_tungstenite::{accept_async, tungstenite::Message};
 use crate::auth::AuthManager;
 use crate::config::ServerConfig;
 use crate::messages::{ClientMessage, ServerMessage};
+use crate::slash_commands::get_predefined_commands;
 use crate::types::{AuthMethod, AuthStatus, ClientInfo, ServerState};
 use crate::ui::TerminalUI;
 
@@ -349,11 +350,17 @@ impl ConnectionHandler {
         >,
         state: &ServerState,
     ) {
-        let response = match msg {
+        match msg {
             ClientMessage::ListRepositories => {
                 let repos = state.repositories.read().await;
-                ServerMessage::RepositoryList {
+                let response = ServerMessage::RepositoryList {
                     repositories: repos.clone(),
+                };
+                
+                if let Ok(json) = serde_json::to_string(&response) {
+                    if let Err(e) = ws_sender.send(Message::Text(json)).await {
+                        error!("Failed to send response: {}", e);
+                    }
                 }
             }
             ClientMessage::SelectRepository { path } => {
@@ -362,26 +369,55 @@ impl ConnectionHandler {
                     let mut selected = state.selected_repository.write().await;
                     *selected = Some(repo.clone());
                     println!("📂 Selected repository: {}", repo.name.bright_green());
-                    ServerMessage::RepositorySelected {
+                    
+                    // Send repository selected message
+                    let repo_msg = ServerMessage::RepositorySelected {
                         repository: repo.clone(),
+                    };
+                    if let Ok(json) = serde_json::to_string(&repo_msg) {
+                        if let Err(e) = ws_sender.send(Message::Text(json)).await {
+                            error!("Failed to send repository selected message: {}", e);
+                        }
+                    }
+                    
+                    // Send commands list message
+                    let commands_msg = ServerMessage::CommandsList {
+                        predefined_commands: get_predefined_commands(),
+                        custom_commands: repo.custom_commands.clone(),
+                    };
+                    
+                    if !repo.custom_commands.is_empty() {
+                        println!("📝 Found {} custom commands for this repository", repo.custom_commands.len());
+                    }
+                    
+                    if let Ok(json) = serde_json::to_string(&commands_msg) {
+                        if let Err(e) = ws_sender.send(Message::Text(json)).await {
+                            error!("Failed to send commands list: {}", e);
+                        }
                     }
                 } else {
-                    ServerMessage::Error {
+                    let error_msg = ServerMessage::Error {
                         message: format!("Repository not found: {}", path),
+                    };
+                    
+                    if let Ok(json) = serde_json::to_string(&error_msg) {
+                        if let Err(e) = ws_sender.send(Message::Text(json)).await {
+                            error!("Failed to send error: {}", e);
+                        }
                     }
                 }
             }
             ClientMessage::Prompt { text } => {
                 // TODO: Implement Claude CLI integration
-                ServerMessage::Response {
+                let response = ServerMessage::Response {
                     text: format!("Echo: {}", text),
+                };
+                
+                if let Ok(json) = serde_json::to_string(&response) {
+                    if let Err(e) = ws_sender.send(Message::Text(json)).await {
+                        error!("Failed to send response: {}", e);
+                    }
                 }
-            }
-        };
-
-        if let Ok(json) = serde_json::to_string(&response) {
-            if let Err(e) = ws_sender.send(Message::Text(json)).await {
-                error!("Failed to send response: {}", e);
             }
         }
     }

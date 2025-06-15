@@ -1,4 +1,5 @@
 use crate::repository::Repository;
+use crate::slash_commands::SlashCommand;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,4 +29,10 @@ pub enum ServerMessage {
 
     #[serde(rename = "response")]
     Response { text: String },
+
+    #[serde(rename = "commands_list")]
+    CommandsList { 
+        predefined_commands: Vec<SlashCommand>,
+        custom_commands: Vec<SlashCommand>,
+    },
 }

@@ -4,6 +4,7 @@ pub mod connection;
 pub mod messages;
 pub mod repository;
 pub mod server;
+pub mod slash_commands;
 pub mod types;
 pub mod ui;
 
